@@ -1,8 +1,16 @@
 import pandas as pd
-from featureSelection import featureSelection
+from featureSelection import featureSelection, BorutaSHAP, PowerSHAP, Boruta, Shapicant, Chi2, F1
+from sklearn.feature_selection import SelectFdr, SelectFpr, SelectFromModel, SelectFwe, SelectKBest, SelectorMixin, SelectPercentile, SequentialFeatureSelector, GenericUnivariateSelect, RFE, RFECV, VarianceThreshold
+
+#funcionan
 from catboost import CatBoostClassifier, CatBoostRegressor
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from xgboost import XGBClassifier, XGBRegressor
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+from sklearn.linear_model import LogisticRegression, LinearRegression
+
+#from lightgbm import LGBMClassifier, LGBMRegressor
+
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score
 from sklearn.svm import SVC, LinearSVC
@@ -34,9 +42,22 @@ df = pd.read_csv('./data/data.csv')
 data = df.drop(['liked'], axis=1)
 target = df['liked']
 
-fs = featureSelection(data, target, "BorutaShap")
-accepted, rejected, tentative = fs.borutashap()
+fs = Shapicant(data, target)
+fs.select_features()
 
+"""
+fs = BorutaSHAP(data, target, model=CatBoostClassifier(n_estimators=250, verbose=0, use_best_model=True), params={"classification": True})
+accepted, rejected, tentative = fs.select_features(plot=False)
+
+fs = BorutaSHAP(data, target, model=CatBoostClassifier(n_estimators=250, verbose=0, use_best_model=True), params={"classification": True})
+accepted, rejected, tentative = fs.select_features(plot=True, tentative=True)
+
+fs = powerSHAP(data, target, model=CatBoostClassifier(n_estimators=250, verbose=0, use_best_model=False))
+accepted, rejected, tentative = fs.select_features()
+
+fs = powerSHAP(data, target, model=CatBoostRegressor(n_estimators=250, verbose=0, use_best_model=True), params={"classification": False})
+accepted, rejected, tentative = fs.select_features()
+"""
 
 """
 

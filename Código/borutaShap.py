@@ -8,10 +8,45 @@ import numpy as np
 from numpy.random import choice
 import seaborn as sns
 import shap
+from explainers import CatboostExplainer, DeepLearningExplainer, EnsembleExplainer, LGBMExplainer, LinearExplainer, XGBoostExplainer
 
 import warnings
 warnings.filterwarnings("ignore")
 
+class ShapExplainerFactory:
+    """Factory class for creating the appropriate ShapExplainer."""
+
+    _explainer_models = [
+        CatboostExplainer,
+        LGBMExplainer,
+        XGBoostExplainer,
+        EnsembleExplainer,
+        LinearExplainer,
+        DeepLearningExplainer,
+    ]
+
+    @classmethod
+    def get_explainer(cls, model):
+        """Get the shap explainer for the given model.
+
+        Parameters
+        ----------
+        model: Any
+            The model to get the shap explainer for.
+
+        Returns
+        -------
+        ShapExplainer
+            The shap explainer for the given model.
+
+        """
+        for explainer_class in cls._explainer_models:
+            try:  # To avoid errors when the library is not installed
+                if explainer_class.supports_model(model):
+                    return explainer_class(model)
+            except Exception:
+                pass
+        raise ValueError(f"Given model ({model}) is not yet supported by our explainer models")
 
 class BorutaShap:
 
@@ -53,7 +88,7 @@ class BorutaShap:
         self.classification = classification
         self.model = model
         self.check_model()
-
+        
 
     def check_model(self):
 
@@ -419,7 +454,7 @@ class BorutaShap:
 
         for (index, col) in enumerate(self.columns):
             map_index = self.order[col]
-            padded_history_shadow[map_index] = self.Shadow_feature_import[index]
+            padded_history_shadow[map_index] = self.Shadow_feature_import[0]
             padded_history_x[map_index] = self.X_feature_import[index]
 
         self.history_shadow = np.vstack((self.history_shadow, padded_history_shadow))
@@ -572,6 +607,7 @@ class BorutaShap:
         """
         mean_value = np.mean(array)
         std_value  = np.std(array)
+        
         return [(element-mean_value)/std_value for element in array]
 
 
@@ -690,18 +726,36 @@ class BorutaShap:
             ValueError:
                 if no model type has been specified tree as default
         """
+        """
+        if 'boost' in str(type(self.model)).lower():
+            self.explainer = shap.TreeExplainer(self.model, feature_perturbation = "tree_path_dependent")
+        
+        elif 'tree' in str(type(self.model)).lower():
+            self.explainer = shap.TreeExplainer(self.model, feature_perturbation = "tree_path_dependent")
 
+        elif 'randomforest' in str(type(self.model)).lower():
+            self.explainer = shap.TreeExplainer(self.model, feature_perturbation = "tree_path_dependent")
 
-        explainer = shap.TreeExplainer(self.model, feature_perturbation = "tree_path_dependent")
+        else:
+            modelo = clone(self.model)
+            modelo.fit(self.X_boruta_train, self.y_train)
+            self.explainer = shap.explainers.Linear(model=modelo, masker=self.X_boruta_train) #feature_perturbation="correlation"
+        """
 
+        explainer = ShapExplainerFactory.get_explainer(model=self.model)
+        self.explainer = explainer.select_explainer(self.X_boruta_train, self.y_train, with_params=True)
 
         if self.sample:
 
-
             if self.classification:
                 # for some reason shap returns values wraped in a list of length 1
-
-                self.shap_values = np.array(explainer.shap_values(self.find_sample()))
+                self.shap_values = np.array(self.explainer.shap_values(self.find_sample()))
+                """
+                if 'tree' in str(type(self.explainer)).lower():
+                    self.shap_values = np.array(self.explainer.shap_values(self.find_sample()))
+                else:
+                    self.shap_values = self.explainer.explain(self.X, self.y, 10, 0.2) 
+                """
                 if isinstance(self.shap_values, list):
 
                     class_inds = range(len(self.shap_values))
@@ -718,14 +772,26 @@ class BorutaShap:
                     self.shap_values = np.abs(self.shap_values).mean(0)
 
             else:
-                self.shap_values = explainer.shap_values(self.find_sample())
+                """
+                if 'tree' in str(type(self.explainer)).lower():
+                    self.shap_values = np.array(self.explainer.shap_values(self.find_sample()))
+                else:
+                    self.shap_values = self.explainer.explain(self.X, self.y, 10, 0.2) 
+                """
+                self.shap_values = np.array(self.explainer.shap_values(self.find_sample()))
                 self.shap_values = np.abs(self.shap_values).mean(0)
 
         else:
 
             if self.classification:
                 # for some reason shap returns values wraped in a list of length 1
-                self.shap_values = np.array(explainer.shap_values(self.X_boruta))
+                self.shap_values = np.array(self.explainer.shap_values(self.X_boruta))
+                """
+                if 'tree' in str(type(self.explainer)).lower():
+                    self.shap_values = np.array(self.explainer.shap_values(self.X_boruta))
+                else:
+                    self.shap_values = self.explainer.explain(self.X, self.y, 10, 0.2) 
+                """
                 if isinstance(self.shap_values, list):
 
                     class_inds = range(len(self.shap_values))
@@ -742,7 +808,13 @@ class BorutaShap:
                     self.shap_values = np.abs(self.shap_values).mean(0)
 
             else:
-                self.shap_values = explainer.shap_values(self.X_boruta)
+                self.shap_values = np.array(self.explainer.shap_values(self.find_sample()))
+                """
+                if 'tree' in str(type(self.explainer)).lower():
+                    self.shap_values = np.array(self.explainer.shap_values(self.find_sample()))
+                else:
+                    self.shap_values = self.explainer.explain(self.X, self.y, 10, 0.2) 
+                """
                 self.shap_values = np.abs(self.shap_values).mean(0)
 
 

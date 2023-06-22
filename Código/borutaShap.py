@@ -8,7 +8,7 @@ import numpy as np
 from numpy.random import choice
 import seaborn as sns
 import shap
-from explainers import CatboostExplainer, DeepLearningExplainer, EnsembleExplainer, LGBMExplainer, LinearExplainer, XGBoostExplainer
+from explainers import CatboostExplainer, DeepLearningExplainer, EnsembleExplainer, TreeExplainer, LGBMExplainer, LinearExplainer, XGBoostExplainer
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -21,6 +21,7 @@ class ShapExplainerFactory:
         LGBMExplainer,
         XGBoostExplainer,
         EnsembleExplainer,
+        TreeExplainer,
         LinearExplainer,
         DeepLearningExplainer,
     ]
@@ -743,7 +744,7 @@ class BorutaShap:
         """
 
         explainer = ShapExplainerFactory.get_explainer(model=self.model)
-        self.explainer = explainer.select_explainer(self.X_boruta_train, self.y_train, with_params=True)
+        self.explainer = explainer.select_explainer(with_params=True)
 
         if self.sample:
 

@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from abc import ABC, abstractmethod
 from typing import Any
 
-from explainers import CatboostExplainer, DeepLearningExplainer, EnsembleExplainer, LGBMExplainer, LinearExplainer, ShapExplainer, XGBoostExplainer
+from explainers import CatboostExplainer, DeepLearningExplainer, EnsembleExplainer, LGBMExplainer, LinearExplainer, TreeExplainer, XGBoostExplainer
 from sklearn.feature_selection import chi2, f_classif, f_regression
 from sklearn.feature_selection import SelectFdr, SelectFpr, SelectFromModel, SelectFwe, SelectKBest, SelectorMixin, SelectPercentile, SequentialFeatureSelector, GenericUnivariateSelect, RFE, RFECV, VarianceThreshold
 from sklearn.preprocessing import LabelEncoder
@@ -41,7 +41,10 @@ class BorutaSHAP(featureSelection):
         self.classification = classification
         self.percentile = percentile
         self.pvalue = pvalue
-        self.fit_kwargs = fit_kwargs
+        if fit_kwargs == {}:
+            self.fit_kwargs = fit_kwargs
+        else:
+            self.fit_kwargs = fit_kwargs['fit_kwargs']
         
     def select_features(self, plot=True, tentative=False):
         if self.model is not None:
@@ -62,16 +65,17 @@ class BorutaSHAP(featureSelection):
             else:
                 Feature_Selector = BorutaShap(model=self.model, importance_measure=self.importance_measure,
                                               classification=self.classification, percentile=self.percentile, pvalue=self.pvalue)
+                
                 accepted, rejected, tentative = Feature_Selector.fit(X=self.X, y=self.y, **self.fit_kwargs)
         else:
             Feature_Selector = BorutaShap(importance_measure=self.importance_measure, classification=self.classification,
                                           percentile=self.percentile, pvalue=self.pvalue)
             accepted, rejected, tentative = Feature_Selector.fit(X=self.X, y=self.y, **self.fit_kwargs)
 
-        if plot:
+        if plot==True:
             Feature_Selector.plot(which_features='all')
 
-        if tentative:
+        if tentative==True:
             accepted, rejected, tentative = Feature_Selector.TentativeRoughFix()
 
         return accepted, rejected, tentative
@@ -100,7 +104,10 @@ class PowerSHAP(featureSelection):
         self.stratify = stratify
         self.show_progress = show_progress
         self.verbose = verbose
-        self.fit_kwargs = fit_kwargs
+        if fit_kwargs == {}:
+            self.fit_kwargs = fit_kwargs
+        else:
+            self.fit_kwargs = fit_kwargs['fit_kwargs']
         
     def select_features(self):
         if self.model is None:
@@ -115,7 +122,7 @@ class PowerSHAP(featureSelection):
                                  force_convergence = self.force_convergence, limit_convergence_its = self.limit_convergence_its, limit_automatic = self.limit_automatic, 
                                  limit_incremental_iterations = self.limit_incremental_iterations, limit_recursive_automatic = self.limit_recursive_automatic, 
                                  stratify = self.stratify, show_progress = self.show_progress, verbose = self.verbose, fit_kwargs = self.fit_kwargs)
-        selector.fit(self.X, self.y, fit_kwargs=self.fit_kwargs) 
+        selector.fit(self.X, self.y, **self.fit_kwargs) 
 
         accepted = selector.transform(self.X).columns
         accepted = list(accepted)
@@ -133,7 +140,7 @@ class PowerSHAP(featureSelection):
 
 
 class Boruta(featureSelection):
-    def __init__(self, data, target, model=None, n_estimators = 1000, perc = 100, alpha = 0.05, two_step = True, max_iter = 100, random_state = None, verbose = 0):
+    def __init__(self, data, target, model=None, n_estimators = 100, perc = 100, alpha = 0.05, two_step = True, max_iter = 100, random_state = None, verbose = 0):
         super().__init__(data, target, model)
         self.n_estimators = n_estimators
         self.perc = perc
@@ -169,6 +176,9 @@ class Boruta(featureSelection):
             for feat in feature_ranks:
                 print('Feature: {:<25} Rank: {},  Keep: {}'.format(feat[0], feat[1], feat[2]))
         
+        print(accepted)
+        print(rejected)
+        print(tentative)
         self._print(accepted, rejected, tentative)
 
         return accepted, rejected, tentative
@@ -185,7 +195,10 @@ class Shapicant(featureSelection):
         self.n_iter = n_iter
         self.verbose = verbose
         self.random_state = random_state
-        self.fit_kwargs = fit_kwargs
+        if fit_kwargs == {}:
+            self.fit_kwargs = fit_kwargs
+        else:
+            self.fit_kwargs = fit_kwargs['fit_kwargs']
         
     def select_features(self, alpha=0.2, plot=False):
 
@@ -196,7 +209,7 @@ class Shapicant(featureSelection):
                                       n_iter=self.n_iter, verbose=self.verbose, random_state=self.random_state)
         else:
             explainer = ShapExplainerFactory.get_explainer(model=self.model)
-            explainer_type, kwargs = explainer.select_explainer(self.X, self.y, with_params=False)
+            explainer_type, kwargs = explainer.select_explainer(with_params=False)
 
             selector = PandasSelector(estimator=self.model, explainer_type=explainer_type,
                                       n_iter=self.n_iter, verbose=self.verbose, random_state=self.random_state)
@@ -218,8 +231,6 @@ class Shapicant(featureSelection):
     
     def _print(self, accepted, rejected, tentative):
         super()._print(accepted, rejected, tentative)
-
-
 
 
 class Chi2(featureSelection):
@@ -250,6 +261,7 @@ class Chi2(featureSelection):
     
     def _print(self, accepted, rejected, tentative):
         super()._print(accepted, rejected, tentative)
+
 
 class F1(featureSelection):
     def __init__(self, data, target):
@@ -285,34 +297,21 @@ class F1(featureSelection):
         super()._print(accepted, rejected, tentative)
 
 class ShapExplainerFactory:
-    """Factory class for creating the appropriate ShapExplainer."""
-
+    
     _explainer_models = [
         CatboostExplainer,
         LGBMExplainer,
         XGBoostExplainer,
         EnsembleExplainer,
+        TreeExplainer,
         LinearExplainer,
         DeepLearningExplainer,
     ]
 
     @classmethod
     def get_explainer(cls, model):
-        """Get the shap explainer for the given model.
-
-        Parameters
-        ----------
-        model: Any
-            The model to get the shap explainer for.
-
-        Returns
-        -------
-        ShapExplainer
-            The shap explainer for the given model.
-
-        """
         for explainer_class in cls._explainer_models:
-            try:  # To avoid errors when the library is not installed
+            try: 
                 if explainer_class.supports_model(model):
                     return explainer_class(model)
             except Exception:

@@ -8,7 +8,7 @@ import numpy as np
 from numpy.random import choice
 import seaborn as sns
 import shap
-from explainers import CatboostExplainer, DeepLearningExplainer, EnsembleExplainer, TreeExplainer, LGBMExplainer, LinearExplainer, XGBoostExplainer
+from explainers import CatboostExplainer, DeepLearningExplainer, EnsembleExplainer, TreeExplainer, LGBMExplainer, LinearExplainer, XGBoostExplainer, IMBCatboostExplainer
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -18,6 +18,7 @@ class ShapExplainerFactory:
 
     _explainer_models = [
         CatboostExplainer,
+        IMBCatboostExplainer,
         LGBMExplainer,
         XGBoostExplainer,
         EnsembleExplainer,
@@ -270,7 +271,14 @@ class BorutaShap:
         fitted model object
 
         """
-        if 'catboost' in str(type(self.model)).lower():
+        if 'imbcatboost' in str(type(self.model)).lower():
+            try:
+                self.model.fit(X, y, verbose=False)
+                
+            except:
+                self.model.fit(X, y)
+
+        elif 'catboost' in str(type(self.model)).lower():
             self.model.fit(X, y, cat_features = self.X_categorical,  verbose=False, eval_set=self.eval_set)
 
         else:
@@ -386,7 +394,7 @@ class BorutaShap:
                 break
             else:
                 self.Check_if_chose_train_or_test_and_train_model()
-
+                
                 self.X_feature_import, self.Shadow_feature_import = self.feature_importance(normalize=normalize)
                 self.update_importance_history()
                 hits = self.calculate_hits()
@@ -727,24 +735,9 @@ class BorutaShap:
             ValueError:
                 if no model type has been specified tree as default
         """
-        """
-        if 'boost' in str(type(self.model)).lower():
-            self.explainer = shap.TreeExplainer(self.model, feature_perturbation = "tree_path_dependent")
-        
-        elif 'tree' in str(type(self.model)).lower():
-            self.explainer = shap.TreeExplainer(self.model, feature_perturbation = "tree_path_dependent")
-
-        elif 'randomforest' in str(type(self.model)).lower():
-            self.explainer = shap.TreeExplainer(self.model, feature_perturbation = "tree_path_dependent")
-
-        else:
-            modelo = clone(self.model)
-            modelo.fit(self.X_boruta_train, self.y_train)
-            self.explainer = shap.explainers.Linear(model=modelo, masker=self.X_boruta_train) #feature_perturbation="correlation"
-        """
 
         explainer = ShapExplainerFactory.get_explainer(model=self.model)
-        self.explainer = explainer.select_explainer(with_params=True)
+        self.explainer = explainer.select_explainer(X_train=self.X_boruta_train, Y_train=self.y_train, X_val=self.X_boruta_test, Y_val=self.y_test, with_params=True)
 
         if self.sample:
 

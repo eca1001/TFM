@@ -8,19 +8,20 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from abc import ABC, abstractmethod
-from typing import Any
 
-from explainers import CatboostExplainer, DeepLearningExplainer, EnsembleExplainer, LGBMExplainer, LinearExplainer, TreeExplainer, XGBoostExplainer
+from explainers import CatboostExplainer, EnsembleExplainer, LGBMExplainer, TreeExplainer, XGBoostExplainer, IMBCatboostExplainer, LinearExplainer, DeepLearningExplainer
 from sklearn.feature_selection import chi2, f_classif, f_regression
 from sklearn.feature_selection import SelectFdr, SelectFpr, SelectFromModel, SelectFwe, SelectKBest, SelectorMixin, SelectPercentile, SequentialFeatureSelector, GenericUnivariateSelect, RFE, RFECV, VarianceThreshold
 from sklearn.preprocessing import LabelEncoder
 
+import copy
+
 
 class featureSelection(ABC):
     def __init__(self, data, target, model=None):
-        self.X = pd.DataFrame(data)
-        self.y = pd.Series(target)
-        self.model = model
+        self.X = data.copy()
+        self.y = target.copy()
+        self.model = copy.deepcopy(model)
         
     @abstractmethod
     def select_features(self):
@@ -208,12 +209,28 @@ class Shapicant(featureSelection):
             selector = PandasSelector(estimator=RandomForestRegressor(n_estimators=100, max_depth=5, random_state=42), explainer_type=shap.TreeExplainer,
                                       n_iter=self.n_iter, verbose=self.verbose, random_state=self.random_state)
         else:
-            explainer = ShapExplainerFactory.get_explainer(model=self.model)
-            explainer_type, kwargs = explainer.select_explainer(with_params=False)
+            X_train, X_test, y_train, y_test = train_test_split(self.X, self.y, random_state=0)
 
-            selector = PandasSelector(estimator=self.model, explainer_type=explainer_type,
-                                      n_iter=self.n_iter, verbose=self.verbose, random_state=self.random_state)
-        
+            if 'imbcatboost' in str(type(self.model)).lower():
+                try:
+                    self.model.fit(self.X, self.y, verbose=False)
+                    
+                except:
+                    self.model.fit(self.X, self.y)
+                
+                explainer = ShapExplainerFactory.get_explainer(model=self.model)
+                explainer_type, kwargs = explainer.select_explainer(X_train=X_train, Y_train=y_train, X_val=X_test, Y_val=y_test, with_params=False)
+
+                selector = PandasSelector(estimator=self.model.base_clf, explainer_type=explainer_type,
+                                        n_iter=self.n_iter, verbose=self.verbose, random_state=self.random_state)
+            else:
+
+                explainer = ShapExplainerFactory.get_explainer(model=self.model)
+                explainer_type, kwargs = explainer.select_explainer(X_train=X_train, Y_train=y_train, X_val=X_test, Y_val=y_test, with_params=False)
+
+                selector = PandasSelector(estimator=self.model, explainer_type=explainer_type,
+                                        n_iter=self.n_iter, verbose=self.verbose, random_state=self.random_state)
+            
         fit_selector = selector.fit(pd.DataFrame(self.X), self.y, explainer_type_params=self.fit_kwargs)
 
         if plot:
@@ -300,6 +317,7 @@ class ShapExplainerFactory:
     
     _explainer_models = [
         CatboostExplainer,
+        IMBCatboostExplainer,
         LGBMExplainer,
         XGBoostExplainer,
         EnsembleExplainer,

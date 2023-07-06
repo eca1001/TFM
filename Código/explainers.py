@@ -31,9 +31,26 @@ class CatboostExplainer(ShapExplainer):
         supported_models = [CatBoostRegressor, CatBoostClassifier]
         return isinstance(model, tuple(supported_models))
 
-    def select_explainer(self, with_params):
+    def select_explainer(self, X_train, Y_train, X_val, Y_val, with_params):
         if with_params:
             return shap.TreeExplainer(self.model, feature_perturbation = "tree_path_dependent")
+        else:
+            return shap.TreeExplainer, {'feature_perturbation': "tree_path_dependent"}
+        
+        
+### IMBCATBOOST
+class IMBCatboostExplainer(ShapExplainer):
+    @staticmethod
+    def supports_model(model) -> bool:
+        from sklearn.calibration import CalibratedClassifierCV, _CalibratedClassifier
+        from catboost import CatBoostClassifier
+        
+        supported_models = [CalibratedClassifierCV, CatBoostClassifier, _CalibratedClassifier]
+        return isinstance(model.base_clf, tuple(supported_models))
+
+    def select_explainer(self, X_train, Y_train, X_val, Y_val, with_params):
+        if with_params:
+            return shap.TreeExplainer(self.model.base_clf, feature_perturbation = "tree_path_dependent")
         else:
             return shap.TreeExplainer, {'feature_perturbation': "tree_path_dependent"}
 
@@ -47,7 +64,7 @@ class LGBMExplainer(ShapExplainer):
         supported_models = [LGBMClassifier, LGBMRegressor]
         return isinstance(model, tuple(supported_models))
 
-    def select_explainer(self, with_params):
+    def select_explainer(self, X_train, Y_train, X_val, Y_val, with_params):
         if with_params:
             return shap.TreeExplainer(self.model, feature_perturbation = "tree_path_dependent")
         else:
@@ -63,7 +80,7 @@ class XGBoostExplainer(ShapExplainer):
         supported_models = [XGBClassifier, XGBRegressor]
         return isinstance(model, tuple(supported_models))
 
-    def select_explainer(self, with_params):
+    def select_explainer(self, X_train, Y_train, X_val, Y_val, with_params):
         if with_params:
             return shap.TreeExplainer(self.model, feature_perturbation = "tree_path_dependent")
         else:
@@ -80,7 +97,7 @@ class EnsembleExplainer(ShapExplainer):
         supported_models = [ForestRegressor, ForestClassifier, BaseGradientBoosting]
         return issubclass(type(model), tuple(supported_models))
 
-    def select_explainer(self, with_params):
+    def select_explainer(self, X_train, Y_train, X_val, Y_val, with_params):
         if with_params:
             return shap.TreeExplainer(self.model, feature_perturbation = "tree_path_dependent")
         else:
@@ -96,7 +113,7 @@ class TreeExplainer(ShapExplainer):
         supported_models = [BaseDecisionTree, DecisionTreeClassifier, DecisionTreeRegressor, ExtraTreeClassifier, ExtraTreeRegressor]
         return issubclass(type(model), tuple(supported_models))
 
-    def select_explainer(self, with_params):
+    def select_explainer(self, X_train, Y_train, X_val, Y_val, with_params):
         if with_params:
             return shap.TreeExplainer(self.model, feature_perturbation = "tree_path_dependent")
         else:
@@ -113,15 +130,15 @@ class LinearExplainer(ShapExplainer):
         supported_models = [LinearClassifierMixin, LinearModel, BaseSGD]
         return issubclass(type(model), tuple(supported_models))
 
-    def select_explainer(self, with_params):
+    def select_explainer(self, X_train, Y_train, X_val, Y_val, with_params):
         from sklearn.base import clone
 
         if with_params:
             modelo = clone(self.model)
-            modelo.fit(X, y)
-            return shap.explainers.Linear(model=modelo, masker=X)
+            modelo.fit(X_train, Y_train)
+            return shap.explainers.Linear(model=modelo, masker=X_train)
         else:
-            return shap.explainers.Linear, {'masker': X}
+            return shap.explainers.Linear, {'masker': X_train}
 
 
 ### DEEP LEARNING

@@ -11,7 +11,6 @@ from abc import ABC, abstractmethod
 
 from explainers import CatboostExplainer, EnsembleExplainer, LGBMExplainer, TreeExplainer, XGBoostExplainer, IMBCatboostExplainer, LinearExplainer, DeepLearningExplainer
 from sklearn.feature_selection import chi2, f_classif, f_regression
-from sklearn.feature_selection import SelectFdr, SelectFpr, SelectFromModel, SelectFwe, SelectKBest, SelectorMixin, SelectPercentile, SequentialFeatureSelector, GenericUnivariateSelect, RFE, RFECV, VarianceThreshold
 from sklearn.preprocessing import LabelEncoder
 
 import copy
@@ -208,6 +207,7 @@ class Shapicant(featureSelection):
             explainer_type = ShapExplainerFactory.get_explainer(model=RandomForestRegressor(n_estimators=100, max_depth=5, random_state=42))
             selector = PandasSelector(estimator=RandomForestRegressor(n_estimators=100, max_depth=5, random_state=42), explainer_type=shap.TreeExplainer,
                                       n_iter=self.n_iter, verbose=self.verbose, random_state=self.random_state)
+            fit_selector = selector.fit(pd.DataFrame(self.X), self.y, explainer_type_params=self.fit_kwargs)
         else:
             X_train, X_test, y_train, y_test = train_test_split(self.X, self.y, random_state=0)
 
@@ -223,6 +223,7 @@ class Shapicant(featureSelection):
 
                 selector = PandasSelector(estimator=self.model.base_clf, explainer_type=explainer_type,
                                         n_iter=self.n_iter, verbose=self.verbose, random_state=self.random_state)
+                fit_selector = selector.fit(pd.DataFrame(self.X), self.y, explainer_type_params=kwargs, **self.fit_kwargs)
             else:
 
                 explainer = ShapExplainerFactory.get_explainer(model=self.model)
@@ -230,8 +231,9 @@ class Shapicant(featureSelection):
 
                 selector = PandasSelector(estimator=self.model, explainer_type=explainer_type,
                                         n_iter=self.n_iter, verbose=self.verbose, random_state=self.random_state)
+                fit_selector = selector.fit(pd.DataFrame(self.X), self.y, explainer_type_params=kwargs, **self.fit_kwargs)
             
-        fit_selector = selector.fit(pd.DataFrame(self.X), self.y, explainer_type_params=self.fit_kwargs)
+        
 
         if plot:
             print(fit_selector.p_values_)
@@ -280,7 +282,7 @@ class Chi2(featureSelection):
         super()._print(accepted, rejected, tentative)
 
 
-class F1(featureSelection):
+class Fvalue(featureSelection):
     def __init__(self, data, target):
         super().__init__(data, target)
 

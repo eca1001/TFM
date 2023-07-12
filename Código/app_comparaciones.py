@@ -1,23 +1,19 @@
 import time
-from sklearn.metrics import balanced_accuracy_score, f1_score, classification_report, confusion_matrix
-from sklearn.model_selection import train_test_split, ParameterSampler
+from sklearn.metrics import balanced_accuracy_score, f1_score
+from sklearn.model_selection import train_test_split
 import pandas as pd
 import numpy as np
-from featureSelection import BorutaSHAP, PowerSHAP, Boruta, Shapicant, Chi2, F1
+from featureSelection import BorutaSHAP, PowerSHAP, Boruta, Shapicant, Chi2, Fvalue
+
 from catboost import CatBoostClassifier, CatBoostRegressor
 from xgboost import XGBClassifier, XGBRegressor
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.linear_model import LogisticRegression
+from sklearn.feature_selection import SelectFdr, SelectFpr, SelectFwe
 
-import time
-
-from sklearn.feature_selection import SelectFdr, SelectFpr, SelectFromModel, SelectFwe, SelectKBest, SelectorMixin, SelectPercentile, SequentialFeatureSelector, GenericUnivariateSelect, RFE, RFECV, VarianceThreshold
-
-from imbalanced_classification.models import IMBCatboostClassifier
 from imbalanced_classification.Combine import Combine
 from sklearn.preprocessing import LabelEncoder
-from sklearn.svm import SVC
 import csv
 import copy
 
@@ -33,11 +29,9 @@ def lanzador(data, target, models, params, args):
         X_train, X_test, y_train, y_test = train_test_split(data, target, test_size=0.3, random_state=42)
         X_res, y_res = ens.fit_resample(X_train, y_train)
 
-        fila = ["Tecnica", "Modelo", "Parametros", "fit_kwargs", "Tiempo", "Accuracy Todas", "Accuracy Aceptadas", "F1 score Todas", "F1 score Aceptadas", "len(rejected)", "Rejected"]
+        fila = ["Tecnica", "Modelo", "Parametros", "fit_kwargs", "Tiempo", "Accuracy Todas", "Accuracy Aceptadas", "F1 score Todas", "F1 score Aceptadas", "Nº de rechazadas", "Rechazadas"]
         escritor_csv.writerow(fila)
         for method in ["Boruta", "Shapicant", "BorutaShap", "PowerShap"]:
-        #for method in ["Boruta", "BorutaShap", "PowerShap"]:
-        #for method in ["Shapicant"]:
             for model in models:
                 if method == "BorutaShap": 
                     param = params['BorutaSHAP']
@@ -137,15 +131,15 @@ def lanzadorTradicionales(data, target, methods, models, params):
         X_train, X_test, y_train, y_test = train_test_split(data, target, test_size=0.3, random_state=42)
         X_res, y_res = ens.fit_resample(X_train, y_train)
 
-        fila = ["Tecnica", "Metodo", "Modelo", "Parametros", "Tiempo", "Accuracy Todas", "Accuracy Aceptadas", "F1 score Todas", "F1 score Aceptadas", "len(rejected)", "rejected"]
+        fila = ["Tecnica", "Metodo", "Modelo", "Parametros", "Tiempo", "Accuracy Todas", "Accuracy Aceptadas", "F1 score Todas", "F1 score Aceptadas", "Nº de rechazadas", "Rechazadas"]
         escritor_csv.writerow(fila)
         
-        for tech in ["Chi2", "F1C", "F1R"]:
+        for tech in ["Chi2", "FC", "FR"]:
             for method in methods:
                 if tech == "Chi2":
                     param = params['Chi2']
-                elif tech == "F1C" or tech=="F1R":
-                    param = params['F1']
+                elif tech == "FC" or tech=="FR":
+                    param = params['Fvalue']
                 for model in models:
                     for fit in param:    
                         start_time = time.time()
@@ -164,14 +158,12 @@ def lanzadorTradicionales(data, target, methods, models, params):
                             if tech == "Chi2":
                                 fs = Chi2(data=X_res, target=y_res)
                                 accepted, rejected, tentative = fs.select_features(method=method, params=fit)
-                            elif tech == "F1C":
-                                fs = F1(data=X_res, target=y_res)
+                            elif tech == "FC":
+                                fs = Fvalue(data=X_res, target=y_res)
                                 accepted, rejected, tentative = fs.select_features(method=method, params=fit, classification=True)
-                            elif tech == "F1R":
-                                fs = F1(data=X_res, target=y_res)
+                            elif tech == "FR":
+                                fs = Fvalue(data=X_res, target=y_res)
                                 accepted, rejected, tentative = fs.select_features(method=method, params=fit, classification=False)
-                            else:
-                                raise ValueError("The method must be Chi2 or F1.")
                         
                             elapsed_time = time.time() - start_time
 
@@ -188,75 +180,23 @@ def lanzadorTradicionales(data, target, methods, models, params):
                             basR = balanced_accuracy_score(y_test, y_pred)
                             f1R = f1_score(y_test, y_pred)
                             
-                            fila = [tech, method, model, fit, elapsed_time, bas, basR, f1, f1R, len(rejected), rejected]
-                            escritor_csv.writerow(fila)
+                            
+                            if 'catboostclassifier' in str(type(mod)).lower():
+                                aux = mod.get_params()
+                                aux2 = ', '.join([f'{key}={value}' for key, value in aux.items()])
+                            
+                                fila = [tech, method, f"CatBoostClassifier({aux2})", fit, elapsed_time, bas, basR, f1, f1R, len(rejected), rejected]
+                                escritor_csv.writerow(fila)
+
+                            elif 'catboostregressor' in str(type(mod)).lower():
+                                aux = mod.get_params()
+                                aux2 = ', '.join([f'{key}={value}' for key, value in aux.items()])
+                            
+                                fila = [tech, method, f"CatBoostRegressor({aux2})", fit, elapsed_time, bas, basR, f1, f1R, len(rejected), rejected]
+                                escritor_csv.writerow(fila)
+
+                            else:
+                                fila = [tech, method, model, fit, elapsed_time, bas, basR, f1, f1R, len(rejected), rejected]
+                                escritor_csv.writerow(fila)
                         except Exception:
                             pass
-
-"""
-df = pd.read_csv('./data/BreastCancerWisconsin_(Diagnostic).csv', sep=',')
-
-le = LabelEncoder()
-
-for column in df.columns:
-    if df[column].dtype == 'object':
-        df[column] = le.fit_transform(df[column])
-
-data = df.drop(['id', 'diagnosis', 'Unnamed: 32'], axis=1)
-target = df["diagnosis"]
-"""
-df = pd.read_csv('./data/IT_customer_churn.csv', sep=',')
-df = df.dropna()
-
-le = LabelEncoder()
-
-for column in df.columns:
-    if df[column].dtype == 'object':
-        df[column] = le.fit_transform(df[column])
-
-data = df.drop(['Churn'], axis=1)
-target = df["Churn"]
-
-
-
-models = [RandomForestClassifier(n_estimators=10), RandomForestClassifier(n_estimators=50), RandomForestClassifier(n_estimators=100),
-          CatBoostClassifier(n_estimators=150, verbose=0, use_best_model=False), CatBoostClassifier(n_estimators=250, verbose=0, use_best_model=False), CatBoostClassifier(n_estimators=350, verbose=0, use_best_model=False),
-          CatBoostClassifier(n_estimators=150, verbose=0, use_best_model=True), CatBoostClassifier(n_estimators=250, verbose=0, use_best_model=True), CatBoostClassifier(n_estimators=350, verbose=0, use_best_model=True),
-          DecisionTreeClassifier(), DecisionTreeClassifier(max_depth=1, max_leaf_nodes=3), DecisionTreeClassifier(max_depth=10, max_leaf_nodes=5), 
-          XGBClassifier(random_state=42), LogisticRegression(max_iter=100), LogisticRegression(max_iter=1000)
-         ]
-"""
-
-param_grid = {
-    'n_estimators': np.arange(50, 1000, 50),
-    'max_depth': np.arange(3, 10),
-    'learning_rate': [0.1, 0.01, 0.001],
-    'colsample_bytree': [0.5, 0.7, 0.9]
-}
-
-# Generar combinaciones de parámetros aleatorios
-param_sampler = ParameterSampler(param_grid, n_iter=20, random_state=42)
-
-# Crear una lista con 20 instancias del modelo con diferentes parámetros
-models = [XGBClassifier(**params) for params in param_sampler]
-"""
-params = {"BorutaSHAP": [{}],
-          "PowerSHAP": [{}],
-          "Boruta": [{}],
-          "Shapicant": [{}]
-          }
-
-args = {"BorutaSHAP": [{}],
-          "PowerSHAP": [{}],
-          "Boruta": [{}],
-          "Shapicant": [{}]
-          }
-
-#lanzador(data, target, models, params, args)
-
-metodosTradicional = [SelectFdr, SelectFpr, SelectFwe, SelectKBest, SelectPercentile, GenericUnivariateSelect]
-paramsTradicional = {"Chi2": [{}], 
-                     "F1": [{}]
-                    }
-
-lanzadorTradicionales(data, target, metodosTradicional, models, paramsTradicional)

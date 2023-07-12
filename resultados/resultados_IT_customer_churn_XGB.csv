@@ -1,4 +1,4 @@
-Tecnica,Modelo,Parametros,fit_kwargs,Tiempo,Accuracy Todas,Accuracy Aceptadas,F1 score Todas,F1 score Aceptadas,len(rejected),Rejected
+Tecnica,Modelo,Parametros,fit_kwargs,Tiempo,Accuracy Todas,Accuracy Aceptadas,F1 score Todas,F1 score Aceptadas,Nº de rechazadas,Rechazadas
 Boruta,"XGBClassifier(colsample_bytree=0.9, learning_rate=0.1, max_depth=9, n_estimators=500)",{},{},43.67082643508911,0.7096625937019605,0.7088056636623175,0.578096947935368,0.5765124555160143,1,['PaperlessBilling']
 Boruta,"XGBClassifier(colsample_bytree=0.5, learning_rate=0.001, max_depth=5, n_estimators=900)",{},{},13.807405471801758,0.7676015920560209,0.7676015920560209,0.6431199411331862,0.6431199411331862,0,[]
 Boruta,"XGBClassifier(colsample_bytree=0.5, learning_rate=0.1, max_depth=8, n_estimators=350)",{},{},21.256388187408447,0.7227429458922827,0.7187124314852171,0.5964912280701755,0.5908289241622574,1,['PaperlessBilling']

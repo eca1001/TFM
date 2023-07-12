@@ -1,4 +1,4 @@
-Tecnica,Modelo,Parametros,fit_kwargs,Tiempo,Accuracy Todas,Accuracy Aceptadas,F1 score Todas,F1 score Aceptadas,len(rejected),Rejected
+Tecnica,Modelo,Parametros,fit_kwargs,Tiempo,Accuracy Todas,Accuracy Aceptadas,F1 score Todas,F1 score Aceptadas,Nº de rechazadas,Rechazadas
 Boruta,RandomForestClassifier(n_estimators=10),{},{},23.845511198043823,0.9748677248677249,0.9748677248677249,0.9682539682539683,0.9682539682539683,3,"['symmetry_mean', 'symmetry_se', 'texture_se']"
 Boruta,RandomForestClassifier(n_estimators=50),{},{},23.819705963134766,0.9748677248677249,0.9702380952380952,0.9682539682539683,0.9606299212598425,3,"['symmetry_mean', 'symmetry_se', 'texture_se']"
 Boruta,RandomForestClassifier(),{},{},23.959631204605103,0.9748677248677249,0.966931216931217,0.9682539682539683,0.96,3,"['symmetry_mean', 'symmetry_se', 'texture_se']"
